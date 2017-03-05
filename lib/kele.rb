@@ -11,10 +11,17 @@ class Kele
   def initialize(email, password)
     @email = email
     @password = password
-    @auth_token = self.class.post(
+
+    response = self.class.post(
       '/sessions',
       { query: { email: @email, password: @password } }
-    )["auth_token"]
+    )
+
+    if response["auth_token"].nil?
+      raise response["message"]
+    else
+      @auth_token = response["auth_token"]
+    end
   end
 
   def get_me
@@ -33,5 +40,44 @@ class Kele
     )
 
     JSON.parse(response.body)
+  end
+
+  def get_messages(page = nil)
+    response = self.class.get(
+      '/message_threads',
+      headers: { "authorization" => @auth_token }
+    )
+
+    body = JSON.parse(response.body)
+
+    unless page.nil?
+      i = (10 * page) - 10
+      messages = []
+      10.times do
+        if body["items"][i]
+          messages << body["items"][i]
+          i += 1
+        else
+          break
+        end
+      end
+      messages
+    else
+      body
+    end
+  end
+
+  def create_message(recipient_id, message, subject = nil, thread_token = nil)
+    response = self.class.post(
+      '/messages',
+      body: {
+        "sender": @email,
+        "recipient_id": recipient_id,
+        "token": thread_token,
+        "subject": subject,
+        "stripped-text": message
+      },
+      headers: { "authorization" => @auth_token }
+    )
   end
 end
